@@ -1,3 +1,6 @@
+require 'json'
+require 'rest-client'
+
 require 'ruboty'
 require 'ruboty/livedoor_weather/version'
 require 'ruboty/livedoor_weather/handlers/livedoor_weather'
