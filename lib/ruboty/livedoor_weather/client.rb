@@ -20,9 +20,7 @@ module Ruboty::LivedoorWeather
       response = RestClient.get(ENDPOINT, params: { city: cc })
       json = JSON.parse(response)
 
-      p json['forecasts']
       forecasts = format_forecasts(json['forecasts'])
-
       "*#{@city}* の天気予報です。\n#{forecasts}\n\n#{json['description']['text']}"
     end
 
