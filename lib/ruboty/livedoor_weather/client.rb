@@ -1,10 +1,10 @@
 module Ruboty::LivedoorWeather
   class Client
     def initialize(message)
-      p message
-      @city      = city(message)
-      @locations = locations(message)
-      @brain     = message.robot.brain
+      @city         = city(message)
+      @locations    = locations(message)
+      @brain        = message.robot.brain
+      @primary_area = retrieve_primary_area
     end
 
     def report
@@ -14,9 +14,16 @@ module Ruboty::LivedoorWeather
     private
 
     def request
-      response = RestClient.get(ENDPOINT, params: { city: 130010 })
+      cc = city_code
+      return "*#{@city}* の予報は見当たりません。" if cc.nil?
+
+      response = RestClient.get(ENDPOINT, params: { city: cc })
       json = JSON.parse(response)
-      json['description']['text']
+
+      p json['forecasts']
+      forecasts = format_forecasts(json['forecasts'])
+
+      "*#{@city}* の天気予報です。\n#{forecasts}\n\n#{json['description']['text']}"
     end
 
     private
@@ -27,6 +34,42 @@ module Ruboty::LivedoorWeather
 
     def locations(message)
       (message[:locations] || ENV['LDW_LOCATIONS'] || '').strip.split(/\s/)
+    end
+
+    def city_code
+      city = @brain.data[:ldw_primary_area].find { |c| c['title'] == @city }
+      city&.fetch('id')
+    end
+
+    def format_forecasts(forecasts)
+      forecasts.each_with_object([]) { |forecast, r|
+        r.push "#{forecast['dateLabel']} #{forecast['telop']} #{format_temperature(forecast['temperature'])}"
+      }.join("\n")
+    end
+
+    def format_temperature(temp, unit: 'celsius')
+      min = temp['min']&.fetch(unit) || '-'
+      max = temp['max']&.fetch(unit) || '-'
+      "気温:#{min}/#{max} #{unit == 'celsius' ? 'C' : 'F' }"
+    end
+
+    def retrieve_primary_area
+      # cache 1.day
+      expire = @brain.data[:ldw_primary_area_expire] || 1.day.ago
+      @brain.data[:ldw_primary_area] = nil if Time.now > expire
+
+      @brain.data[:ldw_primary_area] ||= Array.new.tap do |r|
+        response = RestClient.get(PRIMARY_AREA)
+        xml = Nokogiri::XML(response)
+        xml.xpath('//ldWeather:source//pref').each do |pref|
+          pref.xpath('city').each do |city|
+            c = { 'pref' => pref.attr('title') }
+            city.attributes.each { |k, _| c[k] = city.attr(k) }
+            r.push c
+          end
+        end
+        @brain.data[:ldw_primary_area_expire] = 1.day.since
+      end
     end
   end
 end
