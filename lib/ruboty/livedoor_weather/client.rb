@@ -21,7 +21,7 @@ module Ruboty::LivedoorWeather
       json = JSON.parse(response)
 
       forecasts = format_forecasts(json['forecasts'])
-      "*#{@city}* の天気予報です。\n#{forecasts}\n\n#{json['description']['text']}"
+      "*#{@city}* の天気予報です。\n#{forecasts}\n\n#{remove_linebreak(json['description']['text'])}"
     end
 
     private
@@ -49,6 +49,10 @@ module Ruboty::LivedoorWeather
       min = temp['min']&.fetch(unit) || '-'
       max = temp['max']&.fetch(unit) || '-'
       "気温:#{min}/#{max} #{unit == 'celsius' ? 'C' : 'F' }"
+    end
+
+    def remove_linebreak(forecast_description)
+      forecast_description.gsub(/[^\n。】]\n/) { |m| m.delete("\n") }
     end
 
     def retrieve_primary_area
