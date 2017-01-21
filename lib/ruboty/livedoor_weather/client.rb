@@ -19,9 +19,23 @@ module Ruboty::LivedoorWeather
 
       response = RestClient.get(ENDPOINT, params: { city: cc })
       json = JSON.parse(response)
-
       forecasts = format_forecasts(json['forecasts'])
-      "*#{@city}* の天気予報です。\n#{forecasts}\n\n#{remove_linebreak(json['description']['text'])}"
+
+      result = [
+        "*#{@city}* の天気予報です。",
+        forecasts,
+        "\n",
+        remove_linebreak(json['description']['text']),
+      ]
+
+      pinpoint_locations = format_pinpoint_locations(json['pinpointLocations'], @locations)
+
+      unless pinpoint_locations.empty?
+        result += ["\n", "【ピンポイント天気】"]
+        result += pinpoint_locations
+      end
+
+      result.join("\n")
     end
 
     private
@@ -49,6 +63,12 @@ module Ruboty::LivedoorWeather
       min = temp['min']&.fetch(unit) || '-'
       max = temp['max']&.fetch(unit) || '-'
       "気温:#{min}/#{max} #{unit == 'celsius' ? 'C' : 'F' }"
+    end
+
+    def format_pinpoint_locations(data, locations)
+      data.find_all { |d|
+        locations.include?('all') || locations.include?(d['name'])
+      }.map { |d| "#{d['name']} : #{d['link']}" }
     end
 
     def remove_linebreak(forecast_description)
